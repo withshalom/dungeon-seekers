@@ -164,6 +164,11 @@ body::after {
   grid-template-rows:repeat(3,64px);
   gap:5px;
 }
+.dp-diag {
+  opacity: .55;
+  font-size: 13px !important;
+}
+.dp-diag:active { opacity: 1; }
 .dp {
   background:rgba(255,255,255,.07);
   border:1.5px solid rgba(255,255,255,.18);
@@ -813,15 +818,15 @@ body::after {
   <!-- D-PAD (draggable) -->
   <div id="dpad-wrap">
     <div class="dpad">
-      <div class="dp dp-c"></div>
+      <div class="dp dp-diag" ontouchstart="mD('up');mD('left')" ontouchend="mU('up');mU('left')">◤</div>
       <div class="dp" id="dp-u" ontouchstart="mD('up')" ontouchend="mU('up')">▲</div>
-      <div class="dp dp-c"></div>
+      <div class="dp dp-diag" ontouchstart="mD('up');mD('right')" ontouchend="mU('up');mU('right')">◥</div>
       <div class="dp" id="dp-l" ontouchstart="mD('left')" ontouchend="mU('left')">◀</div>
       <div class="dp dp-c" id="dpad-drag-handle" title="Drag with 2nd finger · Double-tap to reset"></div>
       <div class="dp" id="dp-r" ontouchstart="mD('right')" ontouchend="mU('right')">▶</div>
-      <div class="dp dp-c"></div>
+      <div class="dp dp-diag" ontouchstart="mD('down');mD('left')" ontouchend="mU('down');mU('left')">◣</div>
       <div class="dp" id="dp-d" ontouchstart="mD('down')" ontouchend="mU('down')">▼</div>
-      <div class="dp dp-c"></div>
+      <div class="dp dp-diag" ontouchstart="mD('down');mD('right')" ontouchend="mU('down');mU('right')">◢</div>
     </div>
   </div>
   <!-- ACTION BUTTONS -->
@@ -1459,9 +1464,47 @@ function typeChar(){
   }
 }
 
+let _convTimer=null;
+const _convDelay=[800,900,800,800,700,800,1000,900]; // ms between lines
+
+function _convShowNextLine(){
+  const inner=document.getElementById('conv-inner');
+  if(!inner) return;
+  clearTimeout(_convTimer);
+  if(_convIdx < _convLines.length){
+    const l=_convLines[_convIdx];
+    const d=document.createElement('div');
+    // Use the original conv-ln class for styling — matches existing CSS
+    d.className='conv-ln '+l.c;
+    d.textContent=l.t;
+    const party=window._convPartyEl;
+    inner.insertBefore(d, party||null);
+    _convIdx++;
+    // Auto-advance to next line after delay
+    _convTimer=setTimeout(_convShowNextLine, _convDelay[_convIdx-1]||800);
+  } else {
+    // All lines shown — reveal party + begin
+    if(window._convPartyEl){
+      window._convPartyEl.style.opacity='1';
+      window._convPartyEl.style.transition='opacity .8s';
+    }
+    setTimeout(()=>{
+      const beginEl=document.querySelector('.conv-begin');
+      if(beginEl) beginEl.style.display='block';
+      window._convDone=true;
+    }, 600);
+  }
+}
+
 function convTap(){
-  const btn = document.getElementById('conv-enter-btn');
-  if(btn) btn.click();
+  if(window._convDone){
+    // All done — enter game
+    const btn=document.getElementById('conv-enter-btn');
+    if(btn) btn.click();
+  } else {
+    // Skip ahead to next line immediately
+    _convShowNextLine();
+  }
 }
 
 function nextIntro(){
@@ -1474,30 +1517,42 @@ function nextIntro(){
 // ─────────────────────────────────────────────
 // CONVERGENCE
 // ─────────────────────────────────────────────
+let _convLines=[], _convIdx=0, _convChar=null;
+
 function showConvergence(){
   const char=selChar, sub=selSub;
-  const lines=[
-    {t:'The keep has waited a long time.',c:'sm',d:.3},
-    {t:'Tonight, four strangers share a fire.',c:'sm',d:1.1},
-    {t:'None of them planned to.',c:'sm',d:1.9},
-    {t:'The inn has no name.',c:'sm',d:2.7},
-    {t:'The road does.',c:'sm',d:3.4},
-    {t:'It brought all four of them here.',c:'sm',d:4.1},
-    {t:char.id==='roland' ? char.name+' unfolds the map.' : char.name+' finds the map.',c:'big',d:5.2},
-    {t:char.id==='roland' ? '"Three levels. Possibly four."' : "It leads somewhere no one has come back from.",c:'sm',d:6.0},
+  _convChar=char; _convIdx=0;
+  const _heroName=char?char.name:'The Seeker';
+  const _heroCls=char?char.cls:'';
+  const _heroCls2=sub?sub.cls||'':'';
+  _convLines=[
+    {t:'Thirty years ago, the Shattered Keep fell silent.',c:'sm'},
+    {t:'No siege. No fire. No warning.',c:'sm'},
+    {t:'The gates closed from the inside.',c:'sm'},
+    {t:'Three hundred souls. Gone quiet.',c:'sm'},
+    {t:'Three days ago, the gate opened.',c:'sm'},
+    {t:'No one knows why.',c:'sm'},
+    {t:'No one was watching.',c:'sm'},
+    {t:_heroName+' is watching now.',c:'big'},
+    {t:'At the unnamed inn by the crossroads, three others have arrived.',c:'sm'},
+    {t:'The same road. The same night. No coincidence survives this much intention.',c:'sm'},
   ];
   const inner=document.getElementById('conv-inner');
-  inner.innerHTML=lines.map(l=>`<div class="conv-ln ${l.c}" style="animation-delay:${l.d}s">${l.t}</div>`).join('');
+  inner.innerHTML='';
+  // Show first line immediately
+  _convShowNextLine();
 
   const party=document.createElement('div');
   party.className='conv-party';
-  party.style.animationDelay='6s';
+  party.style.opacity='0';
   party.innerHTML=['⚒️','🏹','🎵','🔮'].map(s=>`<span>${s}</span>`).join('');
   inner.appendChild(party);
+  window._convPartyEl=party;
+  window._convDone=false;
 
   const begin=document.createElement('div');
   begin.className='conv-begin';
-  begin.style.animationDelay='6.8s';
+  begin.style.display='none'; // hidden until all lines shown
   begin.innerHTML=`<div style="font-family:'IM Fell English',serif;font-style:italic;font-size:13px;color:rgba(200,180,130,.5);letter-spacing:2px;margin-bottom:12px">tap to enter the keep</div><div style="border:2px solid ${char.color};cursor:pointer;display:inline-block" id="conv-enter-btn" onclick="startGame()"><div style="padding:12px 26px;background:${char.color}14;font-size:20px;color:${char.color};letter-spacing:3px">▶ ENTER THE KEEP ◀</div></div>`;
   inner.appendChild(begin);
 
@@ -1514,7 +1569,7 @@ function showConvergence(){
 // GAME ENGINE
 // ─────────────────────────────────────────────
 const TS=64; // tile size — big, SNES quality
-const COLS=19, ROWS=25; // portrait: taller than wide
+const COLS=32, ROWS=42; // portrait: taller than wide
 
 // World map — open world pub town feel
 // Tile types: 0=grass, 1=stone_floor, 2=wall, 3=water, 4=tree,
@@ -1526,47 +1581,181 @@ function mkWorld(){
   const g=[];
   for(let r=0;r<H;r++){ g.push([]); for(let c=0;c<W;c++) g[r].push(0); }
 
-  // Road running vertically through center
-  for(let r=0;r<H;r++){ g[r][8]=8; g[r][9]=8; g[r][10]=8; }
-  // Road running horizontally at row 12
-  for(let c=0;c<W;c++){ g[12][c]=8; }
+  // ── ROADS ──
+  // North-south road (center-left)
+  for(let r=0;r<H;r++){ g[r][13]=8; g[r][14]=8; g[r][15]=8; }
+  // East-west crossroads at row 18
+  for(let c=0;c<W;c++) g[18][c]=8;
+  // East spur toward bridge (row 10, cols 20-31)
+  for(let c=20;c<W;c++){ g[10][c]=8; g[11][c]=8; }
+  // West spur into thornwood (row 18, cols 0-3 — dead end into trees)
 
-  // THE INN — center of map, stone building
-  // Inn floor
-  for(let r=5;r<=10;r++) for(let c=3;c<=7;c++) g[r][c]=1;
-  // Inn walls (overwrite edges)
-  for(let c=3;c<=7;c++){ g[5][c]=2; g[10][c]=2; }
-  for(let r=5;r<=10;r++){ g[r][3]=2; g[r][7]=2; }
-  // Inn door
-  g[10][5]=5;
-  // Inn tables (inside)
-  g[7][4]=7; g[7][6]=7;
-  g[8][5]=7;
-  g[6][5]=7; // Roland's desk — empty when you arrive
+  // ── THE UNNAMED INN — crossroads center ──
+  for(let r=14;r<=20;r++) for(let c=8;c<=13;c++) g[r][c]=1;
+  for(let c=8;c<=13;c++){ g[14][c]=2; g[20][c]=2; }
+  for(let r=14;r<=20;r++){ g[r][8]=2; g[r][13]=2; }
+  g[20][10]=5; // south door
+  g[14][10]=5; // north door (opens to road)
+  // Tables — four desks
+  g[17][9]=7;  // Torvin left
+  g[17][12]=7; // Aeryn right
+  g[18][10]=7; // Coren center
+  g[16][11]=7; // Roland
+  // Chests — upper corners, clear of desks
+  g[15][9]=6; g[15][12]=6;
 
-  // Chests moved to inn corners
-  g[5][4]=6; g[5][6]=6;
+  // ── GREYPOST TRADING POST — far northwest ──
+  for(let r=2;r<=6;r++) for(let c=1;c<=5;c++) g[r][c]=1;
+  for(let c=1;c<=5;c++){ g[2][c]=2; g[6][c]=2; }
+  for(let r=2;r<=6;r++){ g[r][1]=2; g[r][5]=2; }
+  g[6][3]=5; // south door
+  g[4][2]=7; g[4][3]=7; g[4][4]=7; // counters
 
-  // Trees scattered on grass
-  const treePts=[[2,2],[3,14],[1,16],[14,2],[15,1],[15,14],[16,16],[0,6],[18,6],[4,20],[14,20],[2,22],[16,22]];
-  treePts.forEach(([r,c])=>{ if(r<H&&c<W) g[r][c]=4; });
+  // ── MILLER'S COTTAGE — northwest, abandoned ──
+  for(let r=8;r<=11;r++) for(let c=1;c<=4;c++) g[r][c]=1;
+  for(let c=1;c<=4;c++){ g[8][c]=2; g[11][c]=2; }
+  for(let r=8;r<=11;r++){ g[r][1]=2; g[r][4]=2; }
+  g[11][2]=5;
+  g[9][2]=7; // collapsed table
+  g[9][3]=6; // forgotten chest
 
-  // Water pond top-right
-  for(let r=2;r<=5;r++) for(let c=13;c<=17;c++) g[r][c]=3;
+  // ── WATCHTOWER — north, east of road ──
+  for(let r=1;r<=4;r++) for(let c=17;c<=20;c++) g[r][c]=1;
+  for(let c=17;c<=20;c++){ g[1][c]=2; g[4][c]=2; }
+  for(let r=1;r<=4;r++){ g[r][17]=2; g[r][20]=2; }
+  g[4][18]=5;
+  g[2][18]=7; g[2][19]=7; // lookout posts
 
-  // Stone path from inn to road
-  g[11][5]=8; g[11][6]=8;
+  // ── THORNWOOD — northwest ──
+  const thornwood=[
+    [1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],
+    [13,0],[13,1],[13,2],[13,3],[13,4],[13,5],[13,6],
+    [12,1],[12,2],[12,3],[12,4],[12,5],[12,6],
+    [11,2],[11,3],[11,4],[11,5],[11,6],[11,7],
+    [10,2],[10,3],[10,4],[10,5],[10,6],[10,7],
+    [9,3],[9,4],[9,5],[9,6],[9,7],
+    [8,4],[8,5],[8,6],
+    [7,3],[7,4],[7,5],[7,6],[7,7],
+    [6,4],[6,5],[6,6],[6,7],
+    [5,4],[5,5],[5,6],[5,7],[5,8],
+    [4,5],[4,6],[4,7],[4,8],
+    [3,5],[3,6],[3,7],[3,8],[3,9],
+    [2,6],[2,7],[2,8],[2,9],[2,10],
+    [1,6],[1,7],[1,8],[1,9],[1,10],[1,11],
+  ];
+  thornwood.forEach(([r,c])=>{ if(r<H&&c<W) g[r][c]=4; });
 
-  // Dungeon entrance — bottom of map
-  for(let c=8;c<=10;c++) g[23][c]=2;
-  g[23][9]=9;
-  g[22][8]=2; g[22][10]=2;
+  // ── HERMIT'S HUT — hidden in thornwood ──
+  g[7][1]=1; g[7][2]=1; // tiny floor
+  g[6][1]=2; g[6][2]=2; // walls
+  g[8][1]=2; g[8][2]=2;
+  g[7][0]=2; // side wall
+  // No door — you squeeze through at [7][2]
 
-  // Second building (stables?) top-left area
-  for(let r=14;r<=18;r++) for(let c=12;c<=16;c++) g[r][c]=1;
-  for(let c=12;c<=16;c++){ g[14][c]=2; g[18][c]=2; }
-  for(let r=14;r<=18;r++){ g[r][12]=2; g[r][16]=2; }
-  g[18][14]=5;
+  // ── MILLPOND & BRIDGE — northeast ──
+  for(let r=6;r<=13;r++) for(let c=22;c<=29;c++) g[r][c]=3; // water
+  // Shoreline irregularity
+  g[6][22]=3; g[6][23]=3; g[7][22]=3;
+  g[13][28]=3; g[13][29]=3; g[12][29]=3;
+  // Bridge — stone crossing at row 10-11
+  for(let c=22;c<=24;c++){ g[10][c]=8; g[11][c]=8; }
+  // Broken waterwheel structure
+  g[8][22]=2; g[9][22]=2; g[8][23]=2;
+  // East road continues past bridge
+  for(let c=29;c<W;c++){ g[10][c]=8; g[11][c]=8; }
+
+  // ── HARWICK'S IRON — southeast of crossroads ──
+  for(let r=20;r<=25;r++) for(let c=19;c<=24;c++) g[r][c]=1;
+  for(let c=19;c<=24;c++){ g[20][c]=2; g[25][c]=2; }
+  for(let r=20;r<=25;r++){ g[r][19]=2; g[r][24]=2; }
+  g[20][21]=5; // north door facing road
+  g[21][20]=7; g[21][21]=7; g[21][22]=7; // forge/anvil tables
+  g[23][23]=6; // chest of iron
+  // Stable attached east
+  for(let r=21;r<=24;r++) for(let c=25;c<=28;c++) g[r][c]=1;
+  g[21][25]=2; g[24][25]=2; g[24][26]=2; g[24][27]=2; g[24][28]=2;
+  g[21][28]=2; g[22][28]=2; g[23][28]=2;
+  g[24][26]=5; // stable door
+
+  // ── VILLAGE WELL — crossroads center ──
+  g[18][16]=2; // well structure
+  g[17][16]=6; // well bucket/chest placeholder
+
+  // ── NOTICE BOARD — by inn ──
+  g[19][14]=7; // board post
+
+  // ── THE BONEFIELDS — southwest ──
+  // Old graves (stone tiles scattered)
+  const graves=[
+    [22,2],[22,4],[22,6],[22,8],
+    [24,1],[24,3],[24,5],[24,7],[24,9],
+    [26,2],[26,4],[26,6],[26,8],
+    [28,1],[28,3],[28,5],[28,7],
+  ];
+  graves.forEach(([r,c])=>{ if(r<H&&c<W) g[r][c]=2; });
+
+  // ── COLLAPSED CHAPEL — bonefields northwest ──
+  // Partial walls — ruined
+  g[23][0]=2; g[23][1]=2; g[23][2]=2; g[23][3]=2;
+  g[27][0]=2; g[27][1]=2; g[27][2]=2; g[27][3]=2;
+  g[24][0]=2; g[25][0]=2; g[26][0]=2;
+  // Interior floor
+  g[24][1]=1; g[24][2]=1; g[24][3]=1;
+  g[25][1]=1; g[25][2]=1; g[25][3]=1;
+  g[26][1]=1; g[26][2]=1; g[26][3]=1;
+  // Altar
+  g[25][2]=7;
+  g[24][2]=6; // offering chest
+
+  // ── SLIME FLATS — southeast mud ──
+  // Low wet ground near east road south (just grass — spawns defined in spawnEnemies)
+
+  // ── THE DUSKROAD — south approach to keep ──
+  // Road narrows — wall corridor from row 32 to 36
+  for(let r=32;r<=37;r++){
+    g[r][13]=2; g[r][14]=8; g[r][15]=8; g[r][16]=2;
+  }
+  // Guard towers flanking road
+  for(let r=30;r<=33;r++) for(let c=10;c<=12;c++) g[r][c]=1;
+  g[30][10]=2; g[30][11]=2; g[30][12]=2;
+  g[33][10]=2; g[33][12]=2;
+  g[30][10]=2; g[31][10]=2; g[32][10]=2; g[33][10]=2;
+  g[30][12]=2; g[31][12]=2; g[32][12]=2; g[33][12]=2;
+  g[33][11]=5;
+  for(let r=30;r<=33;r++) for(let c=17;c<=19;c++) g[r][c]=1;
+  g[30][17]=2; g[30][18]=2; g[30][19]=2;
+  g[33][17]=2; g[33][19]=2;
+  g[30][17]=2; g[31][17]=2; g[32][17]=2; g[33][17]=2;
+  g[30][19]=2; g[31][19]=2; g[32][19]=2; g[33][19]=2;
+  g[33][18]=5;
+
+  // ── THE KEEP GATE — dungeon entrance ──
+  // Gate walls
+  for(let c=11;c<=18;c++) g[38][c]=2;
+  // Gate opening
+  g[38][14]=2; g[38][15]=2;
+  // Flanking towers
+  for(let r=36;r<=40;r++) for(let c=11;c<=13;c++) g[r][c]=2;
+  for(let r=36;r<=40;r++) for(let c=16;c<=18;c++) g[r][c]=2;
+  // Keep floor approach
+  for(let r=39;r<=41;r++) for(let c=13;c<=16;c++) g[r][c]=1;
+  // Stairwell — actual dungeon entry
+  g[40][14]=9; g[40][15]=9;
+  // Courtyard before gate
+  for(let r=37;r<=38;r++) for(let c=13;c<=16;c++) g[r][c]=1;
+
+  // ── SCATTERED TREES on open grass ──
+  const extraTrees=[
+    [3,11],[4,12],[5,13],[6,8],[7,9],[8,10],[9,11],[10,12],
+    [15,0],[16,1],[17,2],[19,0],[20,0],[21,1],
+    [22,11],[23,12],[24,13],[25,12],[26,11],
+    [29,18],[30,19],[31,20],[32,21],[33,22],
+    [15,17],[16,18],[17,19],[19,20],[20,21],
+    [1,21],[2,22],[3,23],[4,24],
+    [35,5],[36,6],[37,4],[38,3],
+    [29,8],[30,7],[31,6],[32,5],
+  ];
+  extraTrees.forEach(([r,c])=>{ if(r<H&&c<W&&g[r][c]===0) g[r][c]=4; });
 
   return g;
 }
@@ -1650,7 +1839,7 @@ let activePartyTab = 'map';
 function initPlayer(){
   const c=_HERO;
   // Start player outside inn door
-  const startX=5*TS+TS/2, startY=11*TS+TS/2;
+  const startX=11*TS, startY=19*TS;
   const spd={torvin:.9,aeryn:1.25,roland:1.05,coren:.95}[c.id]||1;
   const hp={torvin:6,aeryn:5,roland:4,coren:4}[c.id]||4;
   GS.p={
@@ -1756,9 +1945,9 @@ function spawnNPCs(){
   // Party members visible in the inn — hero is NOT an NPC
   const heroId=_HERO?_HERO.id:null;
   GS.npcs=[
-    {id:'torvin',x:4*TS+TS/2,y:7*TS+TS/2,color:'#c8860a',af:0,at:0,facing:0},
-    {id:'aeryn', x:6*TS+TS/2,y:7*TS+TS/2,color:'#2ecc71',af:0,at:0,facing:0},
-    {id:'roland',x:5*TS+TS/2,y:6*TS+TS/2,color:'#e67e22',af:0,at:0,facing:2},
+    {id:'torvin',x:9*TS+TS/2,y:17*TS+TS/2,color:'#c8860a',af:0,at:0,facing:0},
+    {id:'aeryn', x:12*TS+TS/2,y:17*TS+TS/2,color:'#2ecc71',af:0,at:0,facing:0},
+    {id:'roland',x:11*TS+TS/2,y:16*TS+TS/2,color:'#e67e22',af:0,at:0,facing:2},
     {id:'coren', x:4*TS+TS/2,y:8*TS+TS/2,color:'#9b59b6',af:0,at:0,facing:1},
   ].filter(n=>n.id!==_HERO.id);
   // Set NPC default weapons based on party defaults
@@ -1816,11 +2005,22 @@ function spawnNPCs(){
     {id:'harwick', x:HARWICKS_POS.x, y:HARWICKS_POS.y, icon:'🧔', name:'Harwick', shop:'harwicks', color:'#c8860a'},
   ];
 
-  // Enemies in dungeon area (bottom of map)
   GS.enemies=[
-    {type:'slime',x:9*TS+TS/2,y:20*TS,hp:2,mhp:2,spd:.4,dmg:1,color:'#27ae60',sz:16,ar:22,af:0,at_:0,hf:0,ac:0},
-    {type:'skeleton',x:8*TS,y:21*TS,hp:3,mhp:3,spd:.6,dmg:1,color:'#c8b8a0',sz:18,ar:26,af:0,at_:0,hf:0,ac:0},
-    {type:'slime',x:11*TS,y:20*TS,hp:2,mhp:2,spd:.4,dmg:1,color:'#27ae60',sz:16,ar:22,af:0,at_:0,hf:0,ac:0},
+    // Slime flats — southeast, well clear of inn
+    {type:'slime',   x:20*TS,y:26*TS,hp:3,mhp:3,dmg:1,spd:1.2,sz:18,ar:22,color:'#27ae60',hf:0,ac:0,af:0,at_:0},
+    {type:'slime',   x:22*TS,y:27*TS,hp:3,mhp:3,dmg:1,spd:1.2,sz:18,ar:22,color:'#27ae60',hf:0,ac:0,af:0,at_:0},
+    {type:'slime',   x:19*TS,y:28*TS,hp:3,mhp:3,dmg:1,spd:1.2,sz:18,ar:22,color:'#27ae60',hf:0,ac:0,af:0,at_:0},
+    {type:'slime',   x:24*TS,y:25*TS,hp:4,mhp:4,dmg:1,spd:1.3,sz:18,ar:22,color:'#1e8449',hf:0,ac:0,af:0,at_:0},
+    // Bonefields — southwest
+    {type:'skeleton',x:4*TS, y:24*TS,hp:5,mhp:5,dmg:2,spd:1.5,sz:16,ar:24,color:'#bdc3c7',hf:0,ac:0,af:0,at_:0},
+    {type:'skeleton',x:6*TS, y:26*TS,hp:5,mhp:5,dmg:2,spd:1.5,sz:16,ar:24,color:'#bdc3c7',hf:0,ac:0,af:0,at_:0},
+    {type:'skeleton',x:2*TS, y:28*TS,hp:5,mhp:5,dmg:2,spd:1.5,sz:16,ar:24,color:'#bdc3c7',hf:0,ac:0,af:0,at_:0},
+    // Duskroad — approaching keep
+    {type:'skeleton',x:14*TS,y:33*TS,hp:6,mhp:6,dmg:2,spd:1.6,sz:16,ar:24,color:'#95a5a6',hf:0,ac:0,af:0,at_:0},
+    {type:'skeleton',x:15*TS,y:35*TS,hp:6,mhp:6,dmg:2,spd:1.6,sz:16,ar:24,color:'#95a5a6',hf:0,ac:0,af:0,at_:0},
+    // Keep courtyard
+    {type:'skeleton',x:14*TS,y:39*TS,hp:8,mhp:8,dmg:3,spd:1.7,sz:16,ar:24,color:'#7f8c8d',hf:0,ac:0,af:0,at_:0},
+    {type:'skeleton',x:16*TS,y:39*TS,hp:8,mhp:8,dmg:3,spd:1.7,sz:16,ar:24,color:'#7f8c8d',hf:0,ac:0,af:0,at_:0},
   ];
 }
 
@@ -1832,11 +2032,20 @@ function loop(ts){
   update(dt); render();
 }
 
+function enemySolidAt(wx,wy){
+  const c=Math.floor(wx/TS), r=Math.floor(wy/TS);
+  if(r<0||r>=ROWS||c<0||c>=COLS) return true;
+  const t=WORLD[r][c];
+  // Enemies blocked by walls, trees, water, tables, chests AND doors/buildings
+  return t===1||t===2||t===3||t===4||t===5||t===7||
+    (t===6&&!(typeof openedChests!=='undefined'&&openedChests.has(r+','+c)));
+}
+
 function solidAt(wx,wy){
   const c=Math.floor(wx/TS), r=Math.floor(wy/TS);
   if(r<0||r>=ROWS||c<0||c>=COLS) return true;
   const t=WORLD[r][c];
-  return t===2||t===4; // wall or tree
+  return t===2||t===4||t===3||t===7||(t===6&&!(typeof openedChests!=='undefined'&&openedChests.has(r+','+c))); // wall, tree, water, table, unopened chest
 }
 
 function update(dt){
@@ -1859,12 +2068,15 @@ function update(dt){
     p.y+=dy*spd;
     if(solidAt(p.x,p.y+p.h/2)||solidAt(p.x-p.w/3,p.y+p.h/2)||solidAt(p.x+p.w/3,p.y+p.h/2)||solidAt(p.x,p.y-p.h/3)) p.y-=dy*spd;
 
-  // Facing: dominant axis wins; pure diagonal prefers the last pressed
+  // Facing — 8 directions: 0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW
   if(moving){
     const ax=Math.abs(dx), ay=Math.abs(dy);
-    if(ax>ay*1.5)       p.facing=dx>0?1:3; // strongly horizontal
-    else if(ay>ax*1.5)  p.facing=dy>0?2:0; // strongly vertical
-    else if(dx!==0)     p.facing=dx>0?1:3; // true diagonal — use horizontal
+    if(dx===0)      p.facing=dy>0?2:0;           // pure vertical
+    else if(dy===0) p.facing=dx>0?1:3;           // pure horizontal
+    else if(dx>0&&dy<0) p.facing=4;              // NE
+    else if(dx>0&&dy>0) p.facing=5;              // SE
+    else if(dx<0&&dy>0) p.facing=6;              // SW
+    else                p.facing=7;              // NW
   }
   }
   if(dx||dy){p.at+=dt;if(p.at>6){p.at=0;p.af=(p.af+1)%4;}}else p.af=0;
@@ -1887,11 +2099,52 @@ function update(dt){
   GS.enemies.forEach(e=>{
     if(e.hf>0)e.hf-=dt; if(e.ac>0)e.ac-=dt;
     const ex=p.x-e.x,ey=p.y-e.y,dist=Math.hypot(ex,ey)||1;
-    if(dist<280){
-      if(dist>e.ar+4){e.x+=ex/dist*e.spd*dt;e.y+=ey/dist*e.spd*dt;}
-      if(dist<e.ar&&e.ac<=0&&p.inv<=0&&!e._blind){
-      const shieldBlock=p.id==='torvin'&&LOADOUT.torvin.secondary==='torvin_shield_1'?1:0;
-      p.hp-=Math.max(0,e.dmg-shieldBlock);p.inv=70;e.ac=90;burst(p.x,p.y,'#e74c3c',5);if(p.hp<=0)gameOver();}
+    const DETECT=TS*5;   // 5 tiles — notice player
+    const CHASE=TS*7;    // 7 tiles — keep chasing once alerted
+    const LOSE=TS*9;     // 9 tiles — give up chase
+
+    // Alert state — set when player enters detection range
+    if(!e._alerted && dist<DETECT && !e._blind) e._alerted=true;
+    if(e._alerted && dist>LOSE) e._alerted=false; // lost the player
+
+    if(e._alerted && !e._blind && !isStunned(e)){
+      if(dist>e.ar+8){
+        // Chase — move toward player with wall collision
+        const spd=e.spd*dt;
+        const nx=e.x+ex/dist*spd;
+        const ny=e.y+ey/dist*spd;
+        // Try full move, then axis-separated fallbacks — enemies can't enter buildings
+        if(!enemySolidAt(nx,ny+e.sz*.3)&&!enemySolidAt(nx,ny-e.sz*.3)){
+          e.x=nx; e.y=ny;
+        } else if(!enemySolidAt(nx,e.y+e.sz*.3)&&!enemySolidAt(nx,e.y-e.sz*.3)){
+          e.x=nx; // slide horizontally
+        } else if(!enemySolidAt(e.x,ny+e.sz*.3)&&!enemySolidAt(e.x,ny-e.sz*.3)){
+          e.y=ny; // slide vertically
+        }
+        // Clamp to map bounds
+        e.x=Math.max(TS,Math.min((COLS-1)*TS,e.x));
+        e.y=Math.max(TS,Math.min((ROWS-1)*TS,e.y));
+      }
+      // Attack — only when in range AND cooldown expired AND player not invincible
+      if(dist<e.ar && e.ac<=0 && p.inv<=0){
+        const shieldBlock=p.id==='torvin'&&LOADOUT.torvin.secondary==='torvin_shield_1'&&ACTIVE_WEAPON.torvin!=='axe'?1:0;
+        p.hp-=Math.max(0,e.dmg-shieldBlock);
+        p.inv=70; e.ac=90;
+        burst(p.x,p.y,'#e74c3c',5);
+        if(p.hp<=0) gameOver();
+      }
+    } else if(!e._alerted) {
+      // Idle patrol — small random drift
+      if(!e._driftTimer||e._driftTimer<=0){
+        e._driftTimer=60+Math.random()*80;
+        e._driftX=(Math.random()-.5)*0.4;
+        e._driftY=(Math.random()-.5)*0.4;
+      }
+      e._driftTimer-=dt;
+      const ndx=e.x+e._driftX*dt;
+      const ndy=e.y+e._driftY*dt;
+      if(!enemySolidAt(ndx,e.y)) e.x=ndx;
+      if(!enemySolidAt(e.x,ndy)) e.y=ndy;
     }
     e.at_+=dt;if(e.at_>12){e.at_=0;e.af=(e.af+1)%2;}
   });
@@ -1908,6 +2161,22 @@ function update(dt){
   GS.particles=GS.particles.filter(pt=>{pt.x+=pt.vx*dt;pt.y+=pt.vy*dt;pt.life-=dt;pt.vx*=.91;pt.vy*=.91;return pt.life>0;});
 
   updateHUD();
+  // Chest proximity
+  nearChest=null;
+  if(GS.p){
+    const _pc=Math.floor(GS.p.x/TS),_pr=Math.floor(GS.p.y/TS);
+    let _found=false;
+    for(let _dr=-2;_dr<=2&&!_found;_dr++){
+      for(let _dc=-2;_dc<=2&&!_found;_dc++){
+        const _r=_pr+_dr,_c=_pc+_dc;
+        if(_r>=0&&_r<ROWS&&_c>=0&&_c<COLS&&WORLD[_r][_c]===6){
+          if(Math.hypot(GS.p.x-(_c*TS+TS/2),GS.p.y-(_r*TS+TS/2))<TS*1.6){
+            nearChest={r:_r,c:_c}; _found=true;
+          }
+        }
+      }
+    }
+  }
   checkNPCProximity();
   checkShopProximity();
   updateActionBtn();
@@ -1929,16 +2198,20 @@ function hitE(e,dmg){
 function atk(){
   const p=GS.p;if(!p||p.atk)return;
   p.atk=true;p.atkT=14;
-  const angs={0:-Math.PI/2,1:0,2:Math.PI/2,3:Math.PI};
-  p.atkA=angs[p.facing];
+  const angs={
+    0:-Math.PI/2,1:0,2:Math.PI/2,3:Math.PI,
+    4:-Math.PI/4,5:Math.PI/4,6:Math.PI*3/4,7:-Math.PI*3/4
+  };
+  p.atkA=angs[p.facing]||0;
   const type=getAttackType(p);
   const dmg=(p.dmg||1)+(p.dmgBoost||0);
 
   if(type==='bow'){
     // Aeryn ranged — arrow projectile
-    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0]}[p.facing];
+    const _f=p.facing; const _s=.707;
+    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[_s,-_s],5:[_s,_s],6:[-_s,_s],7:[-_s,-_s]}[_f]||[0,1];
     GS.projectiles.push({x:p.x,y:p.y,vx:d[0]*7,vy:d[1]*7,dmg,color:'#c8a040',sz:4,life:80,kind:'arrow',angle:Math.atan2(d[1],d[0])});
-    spawnArrowParticles(p.x,p.y,p.atkA);
+    if(p.atkA!==undefined) spawnArrowParticles(p.x,p.y,p.atkA);
 
   } else if(type==='light_pulse'){
     // Mage light pulse — radiance burst, reveals enemies, no damage
@@ -1971,7 +2244,8 @@ function atk(){
     const spell=CATALOGUE[spellId];
     const effect=spell?spell.effect:'single';
     const sDmg=spell?spell.dmg:dmg;
-    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0]}[p.facing];
+    const _f=p.facing; const _s=.707;
+    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[_s,-_s],5:[_s,_s],6:[-_s,_s],7:[-_s,-_s]}[_f]||[0,1];
     if(effect==='nova'){
       GS.enemies.forEach(e=>{
         if(Math.hypot(e.x-p.x,e.y-p.y)<TS*3){
@@ -2006,8 +2280,10 @@ function atk(){
     const spell=CATALOGUE[spellId];
     const effect=spell?spell.effect:'spread';
     const wDmg=spell?spell.dmg:1;
-    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0]}[p.facing];
-    const perp={0:[1,0],1:[0,1],2:[1,0],3:[0,1]}[p.facing];
+    const _f=p.facing; const _s=.707;
+    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[_s,-_s],5:[_s,_s],6:[-_s,_s],7:[-_s,-_s]}[_f]||[0,1];
+    const _pf=p.facing;
+    const perp={0:[1,0],1:[0,1],2:[1,0],3:[0,1],4:[_s,_s],5:[-_s,_s],6:[_s,_s],7:[_s,-_s]}[_pf]||[1,0];
     if(effect==='burst'){
       for(let i=0;i<4;i++){
         const spread=(Math.random()-.5)*0.4;
@@ -2107,7 +2383,8 @@ function atk(){
 
   } else if(type==='flute_burst'){
     // Swashbuckler with flute — sonic burst ATK (shorter range than SKILL sonic)
-    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0]}[p.facing];
+    const _f=p.facing; const _s=.707;
+    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[_s,-_s],5:[_s,_s],6:[-_s,_s],7:[-_s,-_s]}[_f]||[0,1];
     GS.enemies.forEach(e=>{
       const dx=e.x-p.x,dy=e.y-p.y,dist=Math.hypot(dx,dy)||1;
       const dot=(dx/dist)*d[0]+(dy/dist)*d[1];
@@ -2123,7 +2400,8 @@ function atk(){
   } else if(type==='sword_lunge'){
     // Herald Roland — fast fencing strike with lunge
     const lunge=TS*1.4;
-    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0]}[p.facing];
+    const _f=p.facing; const _s=.707;
+    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[_s,-_s],5:[_s,_s],6:[-_s,_s],7:[-_s,-_s]}[_f]||[0,1];
     // Step forward during lunge
     safeTeleport(p,d[0]*14,d[1]*14,4);
     GS.enemies.forEach(e=>{
@@ -2133,8 +2411,13 @@ function atk(){
     p.atkT=9; // faster than default
 
   } else {
-    // Melee sweep — dagger, sword, axe
-    GS.enemies.forEach(e=>{if(Math.hypot(e.x-p.x,e.y-p.y)<p.rng)hitE(e,dmg);});
+    // Melee sweep — directional cone
+    const _md={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[.707,-.707],5:[.707,.707],6:[-.707,.707],7:[-.707,-.707]}[p.facing]||[0,1];
+    GS.enemies.forEach(e=>{
+      const _ex=e.x-p.x,_ey=e.y-p.y,_ed=Math.hypot(_ex,_ey)||1;
+      const _dot=(_ex/_ed)*_md[0]+(_ey/_ed)*_md[1];
+      if(_ed<p.rng&&_dot>0.3) hitE(e,dmg); // 0.3 = ~72° cone
+    });
     burst(p.x,p.y,p.color,4);
   }
   p.lastAtkType=type;
@@ -2143,7 +2426,8 @@ function atk(){
 function skill(){
   const p=GS.p;if(!p||p.abt>0)return;p.abt=120;
   if(p.id==='torvin'){GS.enemies.forEach(e=>{const d=Math.hypot(e.x-p.x,e.y-p.y)||1;safeEnemyPush(e,(e.x-p.x)/d*64,(e.y-p.y)/d*64);hitE(e,1);});burst(p.x,p.y,p.color,14);}
-  else if(p.id==='aeryn'){const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0]}[p.facing];safeTeleport(p,d[0]*TS*2.5,d[1]*TS*2.5,10);burst(p.x,p.y,'#2ecc71',10);}
+  else if(p.id==='aeryn'){const _f=p.facing; const _s=.707;
+    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[_s,-_s],5:[_s,_s],6:[-_s,_s],7:[-_s,-_s]}[_f]||[0,1];safeTeleport(p,d[0]*TS*2.5,d[1]*TS*2.5,10);burst(p.x,p.y,'#2ecc71',10);}
   else if(p.id==='roland'){p.hp=Math.min(p.maxHp,p.hp+1);burst(p.x,p.y,'#e67e22',12);}
   else if(p.id==='coren'){GS.enemies.forEach(e=>{if(Math.hypot(e.x-p.x,e.y-p.y)<TS*3.5)hitE(e,2);});burst(p.x,p.y,'#9b59b6',20);}
 }
@@ -2508,6 +2792,13 @@ function drawTile(ctx,t,x,y,r,c){
     ctx.strokeStyle='#c8860a44';ctx.lineWidth=2;ctx.strokeRect(x+6,y+6,TS-12,TS-12);
     ctx.restore();
   }
+}
+
+
+// Facing helpers
+function cardinalFacing(f){ return [0,1,2,3,0,1,2,3][f]||f; } // 4-7 → nearest cardinal
+function facingAngle(f){
+  return [Math.PI*1.5,0,Math.PI*.5,Math.PI,Math.PI*1.75,Math.PI*.25,Math.PI*.75,Math.PI*1.25][f]||0;
 }
 
 function drawPlayer(ctx,cx,cy){
@@ -3085,16 +3376,42 @@ function drawBigSlime(ctx,e,cx,cy,bob){
   const x=e.x-cx,y=e.y-cy+bob;
   const sq=1+Math.sin(GS.fr*.14)*.1;
   const sz=e.sz;
-  ctx.save();ctx.shadowColor=e.color;ctx.shadowBlur=10;
-  ctx.fillStyle=e.color+'55';ctx.beginPath();ctx.ellipse(x,y,sz*sq+6,sz/sq+6,0,0,Math.PI*2);ctx.fill();ctx.restore();
-  ctx.fillStyle=e.color;ctx.beginPath();ctx.ellipse(x,y,sz*sq,sz/sq,0,0,Math.PI*2);ctx.fill();
+  // Aggro state — red and angry when chasing player
+  const aggro=e._alerted&&GS.p&&Math.hypot(e.x-GS.p.x,e.y-GS.p.y)<TS*8;
+  const col=aggro?'#cc2200':e.color;
+  const glowCol=aggro?'#ff4400':e.color;
+  // Body
+  ctx.save();ctx.shadowColor=glowCol;ctx.shadowBlur=aggro?16:10;
+  ctx.fillStyle=col+'55';ctx.beginPath();ctx.ellipse(x,y,sz*sq+6,sz/sq+6,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  ctx.fillStyle=col;ctx.beginPath();ctx.ellipse(x,y,sz*sq,sz/sq,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.ellipse(x-3,y-3,sz*.55,sz*.5,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='rgba(255,255,255,.4)';ctx.beginPath();ctx.ellipse(x-5,y-5,6,5,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(x-6,y-2,5,6,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+6,y-2,5,6,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#111';ctx.beginPath();ctx.ellipse(x-5,y-1,3,4,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+7,y-1,3,4,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#333';ctx.fillRect(x-6,y-2,2,2);ctx.fillRect(x+6,y-2,2,2);
-  ctx.strokeStyle='#1a4a1a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x-5,y+5);ctx.quadraticCurveTo(x,y+9+Math.sin(GS.fr*.18)*2,x+5,y+5);ctx.stroke();
-  if(GS.fr%50<25){ctx.fillStyle=e.color+'bb';ctx.beginPath();ctx.ellipse(x+3,y+sz+4,3,4,0,0,Math.PI*2);ctx.fill();}
+  // Eyes — normal: round friendly | aggro: angular angry
+  if(aggro){
+    // Angry eyes — angled inward, red pupils
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.ellipse(x-6,y-3,5,4,0.4,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(x+6,y-3,5,4,-0.4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#cc0000';
+    ctx.beginPath();ctx.ellipse(x-5,y-2,3,3,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(x+7,y-2,3,3,0,0,Math.PI*2);ctx.fill();
+    // Angry eyebrows — slanted down toward center
+    ctx.strokeStyle='#550000';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(x-9,y-8);ctx.lineTo(x-3,y-6);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+9,y-8);ctx.lineTo(x+3,y-6);ctx.stroke();
+    // Angry mouth — jagged frown
+    ctx.strokeStyle='#550000';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(x-5,y+7);ctx.lineTo(x-2,y+5);ctx.lineTo(x+1,y+7);ctx.lineTo(x+4,y+5);ctx.lineTo(x+6,y+7);ctx.stroke();
+  } else {
+    // Happy eyes — round, friendly
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(x-6,y-2,5,6,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+6,y-2,5,6,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#111';ctx.beginPath();ctx.ellipse(x-5,y-1,3,4,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+7,y-1,3,4,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#333';ctx.fillRect(x-6,y-2,2,2);ctx.fillRect(x+6,y-2,2,2);
+    // Happy smile
+    ctx.strokeStyle='#1a4a1a';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(x-5,y+5);ctx.quadraticCurveTo(x,y+9+Math.sin(GS.fr*.18)*2,x+5,y+5);ctx.stroke();
+  }
+  if(GS.fr%50<25){ctx.fillStyle=col+'bb';ctx.beginPath();ctx.ellipse(x+3,y+sz+4,3,4,0,0,Math.PI*2);ctx.fill();}
 }
 
 function drawBigSkel(ctx,e,cx,cy,bob){
@@ -3198,6 +3515,7 @@ function setupKeys(){
     if(e.code==='KeyQ') { toggleWeapon(); return; }
     if(e.code==='KeyM'||e.code==='Tab') { e.preventDefault(); openPartyScreen('map'); return; }
     if(e.code==='KeyE'||e.code==='KeyF') {
+      if(nearChest&&!openedChests.has(nearChest.r+','+nearChest.c)){ openChest(nearChest.r,nearChest.c); return; }
       if(window._nearShop&&!dlgOpen&&!activeShop){ openShop(window._nearShop); return; }
       if(nearNPC&&!dlgOpen){ openDlg(nearNPC.id); return; }
       atk(); return;
@@ -3256,6 +3574,8 @@ function updateNPCBehavior(id){
 // ── INTERACTION DETECTION ──
 const INTERACT_RANGE = 72;
 let nearNPC = null;
+let nearChest = null;
+const openedChests = new Set();
 
 function checkNPCProximity(){
   const p = GS.p;
@@ -3267,7 +3587,10 @@ function checkNPCProximity(){
     if(d < best){ best=d; nearNPC=n; }
   });
   const prompt = document.getElementById('interact-prompt');
-  if(nearNPC && !dlgOpen){
+  if(nearChest&&!openedChests.has(nearChest.r+','+nearChest.c)){
+    prompt.textContent='E · OPEN CHEST';
+    prompt.classList.add('on');
+  } else if(nearNPC && !dlgOpen){
     const char = CHARACTERS.find(c=>c.id===nearNPC.id);
     prompt.textContent = `E · TALK TO ${(char?char.name:'???').toUpperCase()}`;
     prompt.classList.add('on');
@@ -3319,8 +3642,8 @@ const DIALOGUES = {
     },
 
     opening: {
-      text: `"You're the one with the map, then."`,
-      subtext: `Not a question.`,
+      text: `"You're on the road south too, then."`,
+      subtext: `Not a question. He's watching the door.`,
       choices: [
         { textFn: ()=>_HERO&&_HERO.id==='roland'
             ? `"I am."`
@@ -3457,8 +3780,8 @@ const DIALOGUES = {
     color: '#e67e22',
 
     greeting: {
-      text: `"You made it. Good. I was starting to wonder if I'd written the wrong inn."`,
-      subtext: `He's already unfolding the map. It's bigger than you expected.`,
+      text: `"Another one. The road must be feeling generous tonight."`,
+      subtext: `He's nursing a drink and watching the door.`,
       choices: [
         { text: 'Sit across from him.', goto: 'investigate' },
       ]
@@ -3468,16 +3791,17 @@ const DIALOGUES = {
       text: `"Ask me anything. I've been here two days and I've talked to everyone."`,
       subtext: `He means the locals. He has opinions.`,
       choices: [
-        { text: `"Where did you get that map?"`,
-          reply: `"Dead man's boot. Long story. Better map than he deserved."`,
-          subtext: `He smooths a crease with one thumb.`,
+        { text: `"Have you been here long?"`,
+          reply: `"Long enough. The road south has been quiet for thirty years."`,
+          subtext: `He glances toward the south door.`,
           back: 'investigate' },
         { text: `"You seem cheerful for someone heading into a sealed keep."`,
           reply: `"Someone has to be."`,
           subtext: `He grins. It's genuine.`,
           back: 'investigate' },
         { text: `"What do you know about the keep?"`,
-          reply: `"More songs about it than facts. That usually means something went wrong."`,
+          reply: `"Thirty years of silence. Then three days ago — open."`,
+          subtext: `He taps the gate on the map. "No explanation. No bodies at the threshold. Just open."`,
           back: 'investigate' },
         { text: `"Have you met the others?"`,
           reply: `"Torvin won't look at me. Aeryn watched me for an hour before she moved. Coren corrected my ward inscription."`,
@@ -3554,8 +3878,8 @@ const DIALOGUES = {
     color: '#9b59b6',
 
     greeting: {
-      text: `"You're wondering about the egg."`,
-      subtext: `Dey doesn't look up from whatever dey's reading in the air. You haven't even sat down yet.`,
+      text: `"Sit. You have questions. I may have the same ones."`,
+      subtext: `Dey doesn't look up. There's something in the air near des hands — a faint shimmer, like heat.`,
       choices: [
         { text: '"What egg?"', goto: 'egg_explain' },
         { text: 'Sit down without saying anything.', goto: 'investigate',
@@ -4119,7 +4443,7 @@ function closeDlg(){
 function getAttackType(p){
   if(p.id==='aeryn'){
     const useSecondary=ACTIVE_WEAPON.aeryn==='secondary';
-    const tooClose=GS.enemies.some(e=>Math.hypot(e.x-p.x,e.y-p.y)<42);
+    const tooClose=GS.enemies.some(e=>Math.hypot(e.x-p.x,e.y-p.y)<42)&&!useSecondary;
     const sec=CATALOGUE[LOADOUT.aeryn.secondary];
     return (useSecondary||tooClose)&&sec?'dagger':'bow';
   }
@@ -4199,7 +4523,7 @@ function atk(){
       dmg:p.dmg,color:'#c8a040',sz:4,life:80,
       trail:true,type:'arrow'
     });
-    spawnArrowParticles(p.x,p.y,p.atkA);
+    if(p.atkA!==undefined) spawnArrowParticles(p.x,p.y,p.atkA);
   } else if(type==='dagger'||type==='sword'||type==='axe'||type==='staff'){
     // Melee sweep
     GS.enemies.forEach(e=>{
@@ -4236,7 +4560,8 @@ function skill(){
     burst(p.x,p.y,'#f1c40f',8);
 
   } else if(type==='dash'){
-    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0]}[p.facing];
+    const _f=p.facing; const _s=.707;
+    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[_s,-_s],5:[_s,_s],6:[-_s,_s],7:[-_s,-_s]}[_f]||[0,1];
     p.x+=d[0]*TS*2.8; p.y+=d[1]*TS*2.8;
     burst(p.x,p.y,'#2ecc71',10);
 
@@ -4261,7 +4586,8 @@ function skill(){
 
   } else if(type==='surge'){
     // Coren wands — rapid burst forward
-    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0]}[p.facing];
+    const _f=p.facing; const _s=.707;
+    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[_s,-_s],5:[_s,_s],6:[-_s,_s],7:[-_s,-_s]}[_f]||[0,1];
     const wandItem=CATALOGUE[LOADOUT.coren.primary];
     const sDmg=wandItem?wandItem.dmg:1;
     for(let i=0;i<4;i++){
@@ -4329,10 +4655,10 @@ function updateStunned(dt){
 function updateNPCCombat(dt){
   
 const NPC_HOME = {
-  torvin: { x:4*64+32, y:7*64+32, facing:0 },  // left desk (row7,col4)
-  aeryn:  { x:6*64+32, y:7*64+32, facing:0 },  // right desk (row7,col6)
-  coren:  { x:5*64+32, y:8*64+32, facing:0 },  // center desk (row8,col5)
-  roland: { x:5*64+32, y:6*64+32, facing:2 },  // his desk (row6,col5), facing room
+  torvin: { x:9*64+32,  y:17*64+32, facing:0 },
+  aeryn:  { x:12*64+32, y:17*64+32, facing:0 },
+  coren:  { x:10*64+32, y:18*64+32, facing:0 }, // center desk
+  roland: { x:11*64+32, y:16*64+32, facing:2 },
 };
 
 GS.npcs.forEach(n=>{
@@ -5324,7 +5650,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 
 // ── SHOP PROXIMITY POSITIONS ──
-const GREYPOST_POS = { x:2*64+32, y:2*64+32 };
+const GREYPOST_POS = { x:2*64+32, y:3*64+32 };
 const HARWICKS_POS = { x:15*64+32, y:14*64+32 };
 const SHOP_RANGE = 80;
 
@@ -5413,7 +5739,12 @@ function hasSecondaryWeapon(charId){
 function toggleWeapon(){
   const id=_HERO?_HERO.id:null;
   if(!id||!hasSecondaryWeapon(id)) return;
-  // Universal: swap primary and secondary
+  // Aeryn: toggle active weapon (bow/dagger coexist like horn/lute)
+  if(id==='aeryn'){
+    ACTIVE_WEAPON.aeryn=ACTIVE_WEAPON.aeryn==='secondary'?'primary':'secondary';
+    updateWeaponBtn(); _lastActionCtx=''; _lastWeaponIcon=''; updateActionBtn();
+    return;
+  }
   if(id==='roland'){
     const rsec=CATALOGUE[LOADOUT.roland.secondary];
     const hornSec=rsec&&(rsec.id==='roland_horn_1'||rsec.id==='roland_horn_2');
@@ -5471,16 +5802,28 @@ function updateActionBtn(){
   const btn=document.getElementById('btn-action');
   if(!btn) return;
   if(!icon&&!lbl) return;
+  const canOpenChest=nearChest&&!openedChests.has(nearChest.r+','+nearChest.c);
   const canTalk=(nearNPC&&!dlgOpen)||(window._nearShop&&!activeShop);
-  if(canTalk){
+  // Always reset context so button updates correctly
+  const newCtx=canOpenChest?'chest':canTalk?'talk':'atk';
+  if(canOpenChest){
+    if(_lastActionCtx!=='chest'){
+      _lastActionCtx='chest';
+      if(icon) icon.textContent='📦';
+      if(lbl) lbl.textContent='OPEN';
+      btn.style.borderColor='rgba(200,134,10,.6)';
+      btn.style.background='rgba(200,134,10,.2)';
+    }
+  } else if(canTalk){
     if(_lastActionCtx!=='talk'){
       _lastActionCtx='talk';
-      icon.textContent=nearNPC?'💬':'🏪';
-      lbl.textContent=nearNPC?'TALK':'SHOP';
+      if(icon) icon.textContent=nearNPC?'💬':'🏪';
+      if(lbl) lbl.textContent=nearNPC?'TALK':'SHOP';
       btn.style.borderColor='rgba(100,180,255,.6)';
       btn.style.background='rgba(100,180,255,.18)';
     }
   } else {
+    if(_lastActionCtx==='chest') _lastActionCtx=''; // force weapon redraw
     const weapInfo=_HERO?currentWeaponInfo(_HERO.id):{icon:'⚔',name:'ATK'};
     if(_lastActionCtx!=='atk'||_lastWeaponIcon!==weapInfo.icon){
       _lastActionCtx='atk'; _lastWeaponIcon=weapInfo.icon;
@@ -5493,11 +5836,15 @@ function updateActionBtn(){
 }
 
 function mobileAction(){
-  const canTalk=(nearNPC&&!dlgOpen)||(window._nearShop&&!activeShop);
-  if(canTalk){
-    if(nearNPC&&!dlgOpen) openDlg(nearNPC.id);
-    else if(window._nearShop&&!activeShop) openShop(window._nearShop);
-  } else { atk(); }
+  // Chest first
+  if(nearChest&&!openedChests.has(nearChest.r+','+nearChest.c)){
+    openChest(nearChest.r,nearChest.c); return;
+  }
+  // NPC or shop
+  if(nearNPC&&!dlgOpen){ openDlg(nearNPC.id); return; }
+  if(window._nearShop&&!activeShop){ openShop(window._nearShop); return; }
+  // Otherwise attack
+  atk();
 }
 
 function updateToolSlot(){
@@ -5522,6 +5869,56 @@ function updateToolSlot(){
 function hudToolAction(){ openMenuScreen(); }
 
 // ── SHOP PROXIMITY ──
+
+function openChest(r,c){
+  const key=r+','+c;
+  if(openedChests.has(key)) return;
+  openedChests.add(key);
+  burst(c*TS+TS/2,r*TS+TS/2,'#f1c40f',14);
+  WORLD[r][c]=1;
+
+  // First inn chest contains the map
+  if(r===15&&c===9&&!PARTY.hasMap){
+    PARTY.hasMap=true;
+    ECONOMY.owned['roland_map_1']=true;
+    showBuyFlash('Found: A Map');
+    showQuestNotif({title:'A Map',hint:'Someone left it. It shows the road to the keep — and something drawn in the east wing.'});
+    return;
+  }
+
+  const roll=Math.random();
+  if(roll<0.30){
+    // Gold only
+    const gold=Math.floor(Math.random()*12)+6;
+    ECONOMY.gold+=gold;
+    showGoldGain('+'+gold+'🪙',c*TS+TS/2,r*TS);
+    showBuyFlash('Found: '+gold+' gold');
+  } else if(roll<0.55){
+    // Health Draught
+    INVENTORY['potion_1']=(INVENTORY['potion_1']||0)+1;
+    const gold=Math.floor(Math.random()*6)+2;
+    ECONOMY.gold+=gold;
+    showGoldGain('+'+gold+'🪙',c*TS+TS/2,r*TS);
+    showBuyFlash('Found: Health Draught');
+  } else if(roll<0.75){
+    // Greater Draught
+    INVENTORY['potion_2']=(INVENTORY['potion_2']||0)+1;
+    showBuyFlash('Found: Greater Draught');
+  } else if(roll<0.88){
+    // Antitoxin
+    INVENTORY['antitoxin']=(INVENTORY['antitoxin']||0)+1;
+    showBuyFlash('Found: Antitoxin');
+  } else {
+    // Lucky — gold + potion
+    const gold=Math.floor(Math.random()*20)+15;
+    ECONOMY.gold+=gold;
+    INVENTORY['potion_1']=(INVENTORY['potion_1']||0)+1;
+    showGoldGain('+'+gold+'🪙',c*TS+TS/2,r*TS);
+    showBuyFlash('Found: '+gold+' gold + Health Draught');
+  }
+  updateHUD();
+}
+
 function checkShopProximity(){
   if(!GS.p||dlgOpen||activeShop) return;
   const p=GS.p;
@@ -5603,13 +6000,11 @@ const SWIPE_DEADZONE=10;
 function initSwipe(){
   const canvas=document.getElementById('game-canvas');
   if(!canvas) return;
+  let _tapStart=null;
   canvas.addEventListener('touchstart',e=>{
     if(dlgOpen||activeShop) return;
     const t=e.changedTouches[0];
-    // Check if tap landed on an NPC
-    if(tryNPCTap(t.clientX, t.clientY)){
-      e.preventDefault(); return;
-    }
+    _tapStart={x:t.clientX,y:t.clientY,time:Date.now()};
     swipeStart={x:t.clientX,y:t.clientY,id:t.identifier};
     swipeActive=false;
     e.preventDefault();
@@ -5638,7 +6033,21 @@ function initSwipe(){
   },{passive:false});
   canvas.addEventListener('touchend',e=>{
     for(let i=0;i<e.changedTouches.length;i++){
-      if(swipeStart&&e.changedTouches[i].identifier===swipeStart.id){
+      const t2=e.changedTouches[i];
+      // Quick short tap → try NPC interaction
+      if(_tapStart){
+        const dx=Math.abs(t2.clientX-_tapStart.x);
+        const dy=Math.abs(t2.clientY-_tapStart.y);
+        const dt2=Date.now()-_tapStart.time;
+        if(dt2<250&&dx<12&&dy<12){
+          // It's a tap — check NPC
+          if(tryNPCTap(_tapStart.x,_tapStart.y)){
+            _tapStart=null; break;
+          }
+        }
+        _tapStart=null;
+      }
+      if(swipeStart&&t2.identifier===swipeStart.id){
         swipeStart=null;swipeActive=false;
         GS.mk.swipe_left=false;GS.mk.swipe_right=false;
         GS.mk.swipe_up=false;GS.mk.swipe_down=false;
@@ -5769,6 +6178,8 @@ function renderCommandPartyStrip(){
 
 // ── NPC TAP — quick weapon swap ──
 function tryNPCTap(clientX, clientY){
+  // Don't open NPC swap if player is near an unopened chest
+  if(nearChest&&!openedChests.has(nearChest.r+','+nearChest.c)) return false;
   if(!GS.p||!GS.npcs.length) return false;
   const cv=document.getElementById('game-canvas');
   const rect=cv.getBoundingClientRect();
@@ -6056,7 +6467,8 @@ function updateSable(dt){
     if(s.diveTimer<=0){s.state='fly';s.diveTarget=null;}
   } else if(s.state==='scout'){
     s.scoutAngle+=dt*0.05;
-    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0]}[p.facing];
+    const _f=p.facing; const _s=.707;
+    const d={0:[0,-1],1:[1,0],2:[0,1],3:[-1,0],4:[_s,-_s],5:[_s,_s],6:[-_s,_s],7:[-_s,-_s]}[_f]||[0,1];
     const tx=p.x+d[0]*TS*3+Math.cos(s.scoutAngle)*20;
     const ty=p.y+d[1]*TS*3+Math.sin(s.scoutAngle)*20;
     const dx=tx-s.x,dy=ty-s.y,dist=Math.hypot(dx,dy)||1;
